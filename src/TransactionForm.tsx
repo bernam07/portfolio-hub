@@ -1,32 +1,35 @@
 import { useState } from 'react';
-import type { Coin, Transaction } from './types';
+import type { Asset, Transaction } from './types';
 import { Plus } from 'lucide-react';
 
 interface Props {
-  coins: Coin[];
+  assets: Asset[];
   onAdd: (transaction: Omit<Transaction, 'id' | 'date'>) => void;
 }
 
-export default function TransactionForm({ coins, onAdd }: Props) {
-  const [coinId, setCoinId] = useState('');
+export default function TransactionForm({ assets, onAdd }: Props) {
+  const [assetId, setAssetId] = useState('');
   const [amount, setAmount] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
 
+  const cryptos = assets.filter(a => a.type === 'crypto');
+  const stocks = assets.filter(a => a.type === 'stock');
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!coinId || !amount || !purchasePrice) return;
+    if (!assetId || !amount || !purchasePrice) return;
 
-    const selectedCoin = coins.find(c => c.id === coinId);
-    if (!selectedCoin) return;
+    const selectedAsset = assets.find(a => a.id === assetId);
+    if (!selectedAsset) return;
 
     onAdd({
-      coinId,
-      symbol: selectedCoin.symbol,
+      assetId,
+      symbol: selectedAsset.symbol,
       amount: parseFloat(amount),
       purchasePrice: parseFloat(purchasePrice)
     });
 
-    setCoinId('');
+    setAssetId('');
     setAmount('');
     setPurchasePrice('');
   };
@@ -36,14 +39,21 @@ export default function TransactionForm({ coins, onAdd }: Props) {
       <div className="flex-1 w-full">
         <label className="block text-sm font-medium text-textSecondary mb-1">Ativo</label>
         <select
-          value={coinId}
-          onChange={(e) => setCoinId(e.target.value)}
+          value={assetId}
+          onChange={(e) => setAssetId(e.target.value)}
           className="w-full bg-bgDark border border-surface text-textPrimary rounded-lg p-2 focus:outline-none focus:border-accent"
         >
-          <option value="" disabled>Selecionar moeda...</option>
-          {coins.map(coin => (
-            <option key={coin.id} value={coin.id}>{coin.name} ({coin.symbol})</option>
-          ))}
+          <option value="" disabled>Selecionar ativo...</option>
+          <optgroup label="Criptomoedas">
+            {cryptos.map(asset => (
+              <option key={asset.id} value={asset.id}>{asset.name} ({asset.symbol})</option>
+            ))}
+          </optgroup>
+          <optgroup label="Ações">
+            {stocks.map(asset => (
+              <option key={asset.id} value={asset.id}>{asset.name} ({asset.symbol})</option>
+            ))}
+          </optgroup>
         </select>
       </div>
       <div className="flex-1 w-full">

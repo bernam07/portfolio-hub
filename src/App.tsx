@@ -1,38 +1,63 @@
 import { useEffect, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { fetchMarketData } from './api';
-import type { Coin, Transaction } from './types';
-import TransactionForm from './TransactionForm';
-import TransactionList from './TransactionList';
-import PortfolioStats from './PortfolioStats';
+import { supabase } from './supabase';
+import type { Asset, Transaction } from './types';
+import { AuthProvider, useAuth } from './AuthContext';
+import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Navigation from './Navigation';
+import Login from './Login';
+import Dashboard from './Dashboard';
+import Transactions from './Transactions';
+import Market from './Market';
+import AssetDetail from './AssetDetail';
 
-export default function App() {
-  const [assets, setAssets] = useState<Coin[]>([]);
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function AppContent() {
+  const { isAuthenticated, user } = useAuth();
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingMarket, setLoadingMarket] = useState<boolean>(true);
+  const [loadingTransactions, setLoadingTransactions] = useState<boolean>(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem('portfolio_transactions');
-    if (saved) {
+    if (!isAuthenticated || !user) return;
+    
+    async function fetchTransactions() {
       try {
-        setTransactions(JSON.parse(saved));
-      } catch (e) {
-        setTransactions([]);
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .order('date', { ascending: false });
+
+        if (error) throw error;
+        setTransactions(data || []);
+      } catch (err) {
+        toast.error('Erro ao carregar transações.');
+      } finally {
+        setLoadingTransactions(false);
       }
     }
-  }, []);
+
+    fetchTransactions();
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     async function loadData() {
       try {
         const data = await fetchMarketData();
         setAssets(data);
-        setError(null);
       } catch (err) {
-        setError('Erro ao carregar dados do mercado.');
+        toast.error('Erro ao carregar dados do mercado.');
       } finally {
-        setLoading(false);
+        setLoadingMarket(false);
       }
     }
 
@@ -40,87 +65,137 @@ export default function App() {
     const interval = setInterval(loadData, 60000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated]);
 
-  const handleAddTransaction = (newTx: Omit<Transaction, 'id' | 'date'>) => {
-    const transaction: Transaction = {
-      ...newTx,
-      id: crypto.randomUUID(),
-      date: new Date().toISOString()
-    };
+  const handleAddTransaction = async (newTx: Omit<Transaction, 'id' | 'date'>) => {
+    if (!user) return;
+    const toastId = toast.loading('A adicionar transação...');
     
-    const updated = [...transactions, transaction];
-    setTransactions(updated);
-    localStorage.setItem('portfolio_transactions', JSON.stringify(updated));
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert([
+          {
+            user_id: user.id,
+            assetId: newTx.assetId,
+            symbol: newTx.symbol,
+            amount: newTx.amount,
+            purchasePrice: newTx.purchasePrice
+          }
+        ])
+        .select();
+
+      if (error) throw error;
+      if (data) {
+        setTransactions([data[0], ...transactions]);
+        toast.success('Transação adicionada!', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Erro ao adicionar transação.', { id: toastId });
+    }
   };
 
-  if (loading) {
+  const handleDeleteTransaction = async (id: string) => {
+    const toastId = toast.loading('A eliminar...');
+    
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setTransactions(transactions.filter(tx => tx.id !== id));
+      toast.success('Transação eliminada.', { id: toastId });
+    } catch (err) {
+      toast.error('Erro ao eliminar transação.', { id: toastId });
+    }
+  };
+
+  const handleUpdateTransaction = async (id: string, amount: number, purchasePrice: number) => {
+    const toastId = toast.loading('A atualizar...');
+    
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ amount, purchasePrice })
+        .eq('id', id);
+
+      if (error) throw error;
+      setTransactions(transactions.map(tx => 
+        tx.id === id ? { ...tx, amount, purchasePrice } : tx
+      ));
+      toast.success('Transação atualizada!', { id: toastId });
+    } catch (err) {
+      toast.error('Erro ao atualizar transação.', { id: toastId });
+    }
+  };
+
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-bgDark flex items-center justify-center">
-        <p className="text-textSecondary text-lg font-medium">A sincronizar mercado...</p>
-      </div>
+      <>
+        <Toaster position="bottom-right" toastOptions={{ style: { background: '#1E1E1E', color: '#fff', borderRadius: '12px' } }} />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </>
     );
   }
 
-  if (error) {
+  if (loadingMarket || loadingTransactions) {
     return (
       <div className="min-h-screen bg-bgDark flex items-center justify-center">
-        <p className="text-danger text-lg font-medium">{error}</p>
+        <p className="text-textSecondary text-lg font-medium">A sincronizar com o Supabase...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-bgDark p-6 md:p-12">
-      <header className="max-w-4xl mx-auto mb-10 flex items-center justify-between border-b border-surface pb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-textPrimary tracking-tight">Portfólio</h1>
-          <p className="text-textSecondary mt-1">Dashboard e Mercado em tempo real</p>
-        </div>
-        <div className="bg-surface p-3 rounded-2xl">
-          <Wallet className="w-6 h-6 text-accent" />
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto">
-        <PortfolioStats transactions={transactions} assets={assets} />
-        
-        <TransactionForm coins={assets} onAdd={handleAddTransaction} />
-        
-        <TransactionList transactions={transactions} />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
-          {assets.map((coin) => {
-            const price = coin.quotes.USD.price;
-            const change24h = coin.quotes.USD.percent_change_24h;
-            const isPositive = change24h >= 0;
-
-            return (
-              <div key={coin.id} className="bg-surface rounded-2xl p-5 hover:bg-opacity-80 transition-colors">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-textPrimary">{coin.name}</h2>
-                    <span className="text-sm text-textSecondary uppercase">{coin.symbol}</span>
-                  </div>
-                  <span className="text-xs font-bold bg-bgDark px-2 py-1 rounded-md text-textSecondary">
-                    #{coin.rank}
-                  </span>
-                </div>
-                
-                <div className="flex items-end justify-between">
-                  <span className="text-2xl font-bold text-textPrimary">
-                    ${price < 1 ? price.toFixed(4) : price.toFixed(2)}
-                  </span>
-                  <div className={`flex items-center text-sm font-medium ${isPositive ? 'text-success' : 'text-danger'}`}>
-                    {isPositive ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
-                    {Math.abs(change24h).toFixed(2)}%
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+    <div className="min-h-screen bg-bgDark flex flex-col md:flex-row">
+      <Toaster position="bottom-right" toastOptions={{ style: { background: '#1E1E1E', color: '#fff', borderRadius: '12px' } }} />
+      <Navigation />
+      <main className="flex-1 p-6 md:p-12 h-screen overflow-y-auto">
+        <Routes>
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Dashboard transactions={transactions} assets={assets} />
+            </ProtectedRoute>
+          } />
+          <Route path="/transactions" element={
+            <ProtectedRoute>
+              <Transactions 
+                assets={assets}
+                transactions={transactions}
+                onAdd={handleAddTransaction}
+                onDelete={handleDeleteTransaction}
+                onUpdate={handleUpdateTransaction}
+              />
+            </ProtectedRoute>
+          } />
+          <Route path="/market" element={
+            <ProtectedRoute>
+              <Market assets={assets} />
+            </ProtectedRoute>
+          } />
+          <Route path="/asset/:id" element={
+            <ProtectedRoute>
+              <AssetDetail assets={assets} transactions={transactions} />
+            </ProtectedRoute>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
   );
 }

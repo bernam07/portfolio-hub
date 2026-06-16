@@ -1,16 +1,16 @@
-import type { Coin, Transaction } from './types';
+import type { Asset, Transaction } from './types';
 
 interface Props {
   transactions: Transaction[];
-  assets: Coin[];
+  assets: Asset[];
 }
 
 export default function PortfolioStats({ transactions, assets }: Props) {
   const totalInvested = transactions.reduce((acc, tx) => acc + (tx.amount * tx.purchasePrice), 0);
   
   const currentValue = transactions.reduce((acc, tx) => {
-    const coin = assets.find(c => c.id === tx.coinId);
-    const currentPrice = coin ? coin.quotes.USD.price : tx.purchasePrice;
+    const asset = assets.find(a => a.id === tx.assetId);
+    const currentPrice = asset ? asset.quotes.USD.price : tx.purchasePrice;
     return acc + (tx.amount * currentPrice);
   }, 0);
 

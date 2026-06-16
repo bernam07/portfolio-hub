@@ -1,23 +1,24 @@
-export interface CoinQuote {
+export interface AssetQuote {
   price: number;
   percent_change_24h: number;
 }
 
-export interface CoinQuotes {
-  USD: CoinQuote;
+export interface AssetQuotes {
+  USD: AssetQuote;
 }
 
-export interface Coin {
+export interface Asset {
   id: string;
   name: string;
   symbol: string;
   rank: number;
-  quotes: CoinQuotes;
+  type: 'crypto' | 'stock';
+  quotes: AssetQuotes;
 }
 
 export interface Transaction {
   id: string;
-  coinId: string;
+  assetId: string;
   symbol: string;
   amount: number;
   purchasePrice: number;
