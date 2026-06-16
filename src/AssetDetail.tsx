@@ -1,8 +1,9 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Activity, Newspaper, History } from 'lucide-react';
+import { ArrowLeft, TrendingUp, TrendingDown, Newspaper, History } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useMemo, useState, useEffect } from 'react';
 import type { Asset, Transaction } from './types';
+import { useSettings } from './SettingsContext';
 
 interface Props {
   assets: Asset[];
@@ -13,6 +14,12 @@ export default function AssetDetail({ assets, transactions }: Props) {
   const { id } = useParams<{ id: string }>();
   const asset = assets.find(a => a.id === id);
   const [news, setNews] = useState<any[]>([]);
+  const { currency, exchangeRate } = useSettings();
+
+  const formatCurrency = (val: number) => {
+    const finalVal = currency === 'EUR' ? val * exchangeRate : val;
+    return new Intl.NumberFormat('pt-PT', { style: 'currency', currency }).format(finalVal);
+  };
 
   const assetTransactions = transactions.filter(tx => tx.assetId === id);
   const totalInvested = assetTransactions.reduce((acc, tx) => acc + (tx.amount * tx.purchasePrice), 0);
@@ -43,15 +50,17 @@ export default function AssetDetail({ assets, transactions }: Props) {
     for (let i = 30; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
+      const convertedPrice = currency === 'EUR' ? current * exchangeRate : current;
       data.push({
         date: date.toLocaleDateString('pt-PT', { month: 'short', day: 'numeric' }),
-        price: Number(current.toFixed(2))
+        price: Number(convertedPrice.toFixed(2))
       });
       current += (asset.quotes.USD.price - current) * 0.15 + (Math.random() - 0.5) * (asset.quotes.USD.price * 0.05);
     }
-    data[data.length - 1].price = asset.quotes.USD.price;
+    const finalConvertedPrice = currency === 'EUR' ? asset.quotes.USD.price * exchangeRate : asset.quotes.USD.price;
+    data[data.length - 1].price = Number(finalConvertedPrice.toFixed(2));
     return data;
-  }, [asset]);
+  }, [asset, currency, exchangeRate]);
 
   if (!asset) {
     return (
@@ -63,6 +72,7 @@ export default function AssetDetail({ assets, transactions }: Props) {
   }
 
   const isPositive = asset.quotes.USD.percent_change_24h >= 0;
+  const symbol = currency === 'EUR' ? '€' : '$';
 
   return (
     <div className="max-w-5xl mx-auto pb-12">
@@ -84,7 +94,7 @@ export default function AssetDetail({ assets, transactions }: Props) {
 
         <div className="text-left md:text-right">
           <p className="text-4xl font-bold text-textPrimary mb-2">
-            ${asset.quotes.USD.price < 1 ? asset.quotes.USD.price.toFixed(4) : asset.quotes.USD.price.toFixed(2)}
+            {formatCurrency(asset.quotes.USD.price)}
           </p>
           <div className={`flex items-center md:justify-end font-medium ${isPositive ? 'text-success' : 'text-danger'}`}>
             {isPositive ? <TrendingUp className="w-5 h-5 mr-1" /> : <TrendingDown className="w-5 h-5 mr-1" />}
@@ -105,11 +115,11 @@ export default function AssetDetail({ assets, transactions }: Props) {
                 </linearGradient>
               </defs>
               <XAxis dataKey="date" stroke="#A0A0A0" fontSize={12} tickLine={false} axisLine={false} dy={10} minTickGap={30} />
-              <YAxis stroke="#A0A0A0" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} domain={['auto', 'auto']} dx={-10} />
+              <YAxis stroke="#A0A0A0" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${symbol}${val}`} domain={['auto', 'auto']} dx={-10} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#1E1E1E', borderColor: '#1E1E1E', borderRadius: '8px', color: '#FFFFFF' }}
                 itemStyle={{ color: isPositive ? '#32D74B' : '#FF453A', fontWeight: 600 }}
-                formatter={(value: any) => [`$${value}`, 'Preço']}
+                formatter={(value: any) => [`${symbol}${value}`, 'Preço']}
               />
               <Area type="monotone" dataKey="price" stroke={isPositive ? '#32D74B' : '#FF453A'} strokeWidth={3} fillOpacity={1} fill="url(#colorPrice)" />
             </AreaChart>
@@ -118,7 +128,6 @@ export default function AssetDetail({ assets, transactions }: Props) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Histórico do Utilizador */}
         <div>
           <div className="flex items-center gap-2 mb-6">
             <History className="w-5 h-5 text-accent" />
@@ -132,7 +141,7 @@ export default function AssetDetail({ assets, transactions }: Props) {
             </div>
             <div className="text-right">
               <p className="text-textSecondary text-sm">Total Investido</p>
-              <p className="text-xl font-bold text-textPrimary">${totalInvested.toFixed(2)}</p>
+              <p className="text-xl font-bold text-textPrimary">{formatCurrency(totalInvested)}</p>
             </div>
           </div>
 
@@ -144,7 +153,7 @@ export default function AssetDetail({ assets, transactions }: Props) {
                     <tr key={tx.id} className="border-b border-bgDark last:border-0 hover:bg-bgDark transition-colors">
                       <td className="p-4 text-sm text-textSecondary">{new Date(tx.date).toLocaleDateString('pt-PT')}</td>
                       <td className="p-4 text-textPrimary font-medium">{tx.amount}</td>
-                      <td className="p-4 text-textPrimary text-right">${tx.purchasePrice.toFixed(2)}</td>
+                      <td className="p-4 text-textPrimary text-right">{formatCurrency(tx.purchasePrice)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -155,7 +164,6 @@ export default function AssetDetail({ assets, transactions }: Props) {
           </div>
         </div>
 
-        {/* Notícias do Ativo */}
         <div>
           <div className="flex items-center gap-2 mb-6">
             <Newspaper className="w-5 h-5 text-accent" />

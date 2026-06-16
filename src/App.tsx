@@ -4,6 +4,7 @@ import { fetchMarketData } from './api';
 import { supabase } from './supabase';
 import type { Asset, Transaction } from './types';
 import { AuthProvider, useAuth } from './AuthContext';
+import { SettingsProvider } from './SettingsContext';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 import Navigation from './Navigation';
@@ -67,7 +68,8 @@ function AppContent() {
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
-  const handleAddTransaction = async (newTx: Omit<Transaction, 'id' | 'date'>) => {
+  // ALERTA: Assinatura atualizada para receber a data e enviá-la ao Supabase
+  const handleAddTransaction = async (newTx: Omit<Transaction, 'id'>) => {
     if (!user) return;
     const toastId = toast.loading('A adicionar transação...');
     
@@ -80,7 +82,8 @@ function AppContent() {
             assetId: newTx.assetId,
             symbol: newTx.symbol,
             amount: newTx.amount,
-            purchasePrice: newTx.purchasePrice
+            purchasePrice: newTx.purchasePrice,
+            date: newTx.date // <- Enviamos a data escolhida para a cloud
           }
         ])
         .select();
@@ -193,9 +196,11 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <SettingsProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </SettingsProvider>
     </AuthProvider>
   );
 }
