@@ -1,73 +1,90 @@
-# React + TypeScript + Vite
+# PortfolioHub
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+PortfolioHub is a comprehensive, full-stack Progressive Web App (PWA) designed to help investors track and manage their cryptocurrency and stock portfolios in real-time. Built with a modern React stack, it features secure cloud synchronization, dynamic charts, and a highly customizable user experience.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+* **Real-Time Market Data:** Live quotes for top cryptocurrencies (via CoinPaprika) and major tech stocks (via Finnhub).
+* **Advanced Dashboard:** Automatically calculates total investment, current balance, and overall profit/loss with a dynamic area chart visualizing your portfolio's evolution.
+* **Transaction Management:** Seamlessly log buy/sell orders with historical date selection, a visual asset picker modal, and advanced sorting/filtering capabilities.
+* **Detailed Asset Analytics:** Dive deep into individual assets with dedicated pages featuring 30-day performance charts and a live news feed for stocks.
+* **Personalization:** Global toggle for Light/Dark mode and Multi-Currency support (USD / EUR).
+* **Progressive Web App (PWA):** Fully installable on iOS and Android devices for a native app-like experience.
+* **Secure Authentication:** User registration and session management powered by Supabase Auth.
+* **Cloud Database:** All transactions and user data are securely stored and synced via Supabase PostgreSQL.
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+* **Frontend:** React 18, TypeScript, Vite
+* **Styling:** Tailwind CSS, Lucide React (Icons)
+* **Charts:** Recharts
+* **Notifications:** React Hot Toast
+* **Backend as a Service:** Supabase (Auth & PostgreSQL database)
+* **APIs:** Finnhub (Stocks & News), CoinPaprika (Cryptocurrency)
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Make sure you have [Node.js](https://nodejs.org/) installed on your machine. You will also need active accounts on **Supabase** and **Finnhub** to generate the required API keys.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. **Clone the repository:**
+```bash
+git clone [https://github.com/bernam07/portfolio-hub.git](https://github.com/bernam07/portfolio-hub.git)
+cd portfolio-hub
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+2. **Install dependencies:**
+```bash
+npm install
 ```
+
+3. **Configure Environment Variables:**
+Create a `.env.local` file in the root directory and add your API keys:
+```env
+VITE_SUPABASE_URL=[https://your-project-id.supabase.co](https://your-project-id.supabase.co)
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+VITE_FINNHUB_API_KEY=your-finnhub-api-key
+```
+
+4. **Database Setup:**
+Run the following SQL snippet in your Supabase SQL Editor to create the transactions table and apply security policies:
+```sql
+CREATE TABLE transactions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  "assetId" TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  "purchasePrice" NUMERIC NOT NULL,
+  date TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can only access their own transactions"
+  ON transactions FOR ALL
+  USING (auth.uid() = user_id);
+```
+
+5. **Start the Development Server:**
+```bash
+npm run dev
+```
+
+### Building for Production
+
+To build the app and generate the PWA service workers, run:
+```bash
+npm run build
+```
+
+## PWA Installation
+
+Once deployed or running locally over HTTPS, you can install the app directly to your device's home screen by opening the browser menu and selecting **"Add to Home Screen"** or **"Install App"**.
+
+## License
+
+This project is licensed under the MIT License.
